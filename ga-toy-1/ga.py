@@ -4,6 +4,9 @@
 import sys
 import argparse
 import random
+import util
+import copy
+import math
 
 DEBUG = True
 
@@ -12,22 +15,31 @@ class NString:
     def generate(n = 1):
         return NString(n)
 
-    def __init__(self, n = 1):
-        self.n = n
-        self.string = ""
-        for i in xrange(self.n): 
-            self.string += str(int(random.uniform(0, 1) + 0.5))
+    def __init__(self, args):
+        self.n = args["n"]
+        self.string = args["string"]
+        if self.string is None:
+            self.string = ""
+            for i in xrange(self.n): 
+                self.string += str(int(random.uniform(0, 1) + 0.5))
 
-    def mutate(self, num):
-        assert num <= self.n, "Cannot have more mutations than there are places in the string"
-        mutate = [1] * num + [0] * (self.n - num)
-        random.shuffle(mutate)
+    def mutate(self, p):
         newString = ""
         for i in xrange(self.n):
-            if mutate[i]: newString += str(int(not int(self.string[i])))
-            else:         newString += self.string[i]
+            if util.flipCoin(p): newString += str(int(not int(self.string[i])))
+            else:                newString += self.string[i]
         self.string = newString
 
+    def cross(self, other):
+        assert self.n == other.n, "Right now only handles crossover between equal length strings"
+        if self.n >= 2:
+            idx = int(math.floor(1 + random.uniform(0, 1) * (self.n - 2)))
+            print self.n, idx
+            return [NString({"n" : self.n, "string" : self.string[:idx] + other.string[idx + 1:]}), \
+                    NString({"n" : self.n, "string" : other.string[:idx] + self.string[idx + 1:]})]
+        else:
+            return [copy.copy(self), copy.copy(other)]
+        
 
     def getStringLength(self):
         return self.n
@@ -45,15 +57,34 @@ class NString:
         return self.string
 
 class GA:
-    def __init__(self, dna, fit, populationSize = 1, runs = 1, top = 1, probMutation = 0.5):
+    def __init__(self, dna, dnaArgs, fit, populationSize = 1, runs = 1, top = 1, probMutation = 0.5):
         self.populationSize = populationSize
         self.runs = runs
         self.top = top
-        self.population = [dna.generate() for i in xrange(self.populationSize)]
+        self.population = [dna.generate(dnaArgs) for i in xrange(self.populationSize)]
         self.fit = fit
+        self.probCross = 0.5
 
-    #def advance(self):
+    def advance(self):
+        # build counter dictionary using fit for probability
+        probDist = util.Counter()
+        for dna in self.population:
+            probDist[dna] += 1
         
+
+        newGen = []
+        # pick floor(n + 1) dnas from parent generation
+        for i in xrange((self.populationSize + 1) // 2):
+            parent1 = util.sampleFromCounter(probDist)
+            parent2 = util.sampleFromCounter(probDist)
+            if util.flipCoin(self.probCross):
+                newGen.extend(parent1.cross(parent2))
+
+        for dna in newGen:
+           print dna
+           
+    #def __str__(self):
+                    
 
 # Main wrapper 
 if __name__ == '__main__':
@@ -72,9 +103,8 @@ if __name__ == '__main__':
     print args.n
 
     DEBUG = args.debug
-    test = NString(4)
-    print test
-    test.mutate(2)
-    print test
 
-    ga = GA(NString, lambda l: l.countOnes(), args.pop, args.run, args.top)
+    dnaArgs = {"n": args.n, "string": None}
+
+    ga = GA(NString, dnaArgs, lambda l: l.countOnes(), args.pop, args.run, args.top)
+    ga.advance()
