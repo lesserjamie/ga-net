@@ -34,9 +34,9 @@ class NString:
         assert self.n == other.n, "Right now only handles crossover between equal length strings"
         if self.n >= 2:
             idx = int(math.floor(1 + random.uniform(0, 1) * (self.n - 2)))
-            print self.n, idx
-            return [NString({"n" : self.n, "string" : self.string[:idx] + other.string[idx + 1:]}), \
-                    NString({"n" : self.n, "string" : other.string[:idx] + self.string[idx + 1:]})]
+            #print self.n, idx
+            return [NString({"n" : self.n, "string" : self.string[:idx] + other.string[idx:]}), \
+                    NString({"n" : self.n, "string" : other.string[:idx] + self.string[idx:]})]
         else:
             return [copy.copy(self), copy.copy(other)]
         
@@ -56,41 +56,77 @@ class NString:
     def __str__(self):
         return self.string
 
+    def hash(self):
+        return self.string
+
 class GA:
-    def __init__(self, dna, dnaArgs, fit, populationSize = 1, runs = 1, top = 1, probMutation = 0.5):
-        self.populationSize = populationSize
-        self.runs = runs
-        self.top = top
-        self.population = [dna.generate(dnaArgs) for i in xrange(self.populationSize)]
-        self.fit = fit
-        self.probCross = 0.5
+    class Settings:
+        def __init__(self):
+            self.generationSize = 1
+            self.percentKept    = 0.2
+            self.probCross      = 0.7
+            self.probMutate     = 0.1
+
+    def __init__(self, dnaClass, dnaArgs, fit, settings = None):
+        self.settings = GA.Settings()
+        if settings is not None: self.settings = settings
+        self.population = []
+        self.dnaClass   = dnaClass
+        self.dnaArgs    = dnaArgs
+        self.fit        = fit
+        self.generation = 0
+
+    def initializeRandom(self):
+        self.population = [self.dnaClass.generate(self.dnaArgs)\
+                               for i in xrange(self.settings.populationSize)] 
 
     def advance(self):
         # build counter dictionary using fit for probability
         probDist = util.Counter()
+        hashes = []
         for dna in self.population:
-            probDist[dna] += 1
+            if dna.hash() not in hashes:
+                probDist[dna] += self.fit(dna)
+                hashes.append(dna.hash())
+                #print dna, self.fit(dna)
         
-
-        newGen = []
+        newGen = probDist.sortedKeys()[:int(math.floor(self.settings.percentKept * self.settings.populationSize + random.uniform(0, 1)))]
         # pick floor(n + 1) dnas from parent generation
-        for i in xrange((self.populationSize + 1) // 2):
+
+        for i in xrange((self.settings.populationSize + 1 - len(newGen)) // 2):
             parent1 = util.sampleFromCounter(probDist)
             parent2 = util.sampleFromCounter(probDist)
-            if util.flipCoin(self.probCross):
-                newGen.extend(parent1.cross(parent2))
+            next = []
+            if util.flipCoin(self.settings.probCross):
+                next = parent1.cross(parent2)
+            else:
+                next = [copy.copy(parent1), copy.copy(parent2)]
+            for dna in next:
+                dna.mutate(self.settings.probMutate)
+            newGen.extend(next)
 
-        for dna in newGen:
-           print dna
+        if len(newGen) > self.settings.populationSize: newGen = newGen[:-1]
+        assert len(newGen) == self.settings.populationSize           
+
+        self.population = newGen
+        self.population.sort(key=lambda a: self.fit(a), reverse=True)
+        self.generation += 1
+
+    def getTop(self):
+        return self.population[0]
+
            
-    #def __str__(self):
-                    
+    def __str__(self):
+        string = "Generation: " + str(self.generation) + "\n"
+        for dna in self.population:
+            string += "  " + str(dna) + "\n"
+        return string
 
 # Main wrapper 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Write me.')
-    parser.add_argument('-n', action="store", dest="n", type=int, default=8)
+    parser.add_argument('-n', action="store", dest="n", type=int, default=4)
     parser.add_argument('-pop', action="store", dest="pop", type=int, default=10)
     parser.add_argument('-p', action="store", dest="pop", type=int, default=10)
     parser.add_argument('-run', action="store", dest="run", type=int, default=5)
@@ -100,11 +136,17 @@ if __name__ == '__main__':
     parser.add_argument('-debug', action="store_true", default=False)
 
     args = parser.parse_args()
-    print args.n
-
     DEBUG = args.debug
 
     dnaArgs = {"n": args.n, "string": None}
+    gaArgs  = GA.Settings()
+    gaArgs.populationSize = args.pop
 
-    ga = GA(NString, dnaArgs, lambda l: l.countOnes(), args.pop, args.run, args.top)
-    ga.advance()
+    ga = GA(NString, dnaArgs, lambda l: 2**l.countOnes(), gaArgs)
+    ga.initializeRandom()
+    print ga
+
+    for i in xrange(100):
+        ga.advance()
+
+    print ga.getTop()
