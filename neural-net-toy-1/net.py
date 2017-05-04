@@ -7,7 +7,6 @@ import random
 import copy
 import math
 import numpy
-#import util
 from sklearn import datasets
 from sklearn.neural_network import MLPClassifier
 
@@ -257,6 +256,11 @@ def sample(distribution, values = None):
     i, total= 0, distribution[0]
     while choice > total:
         i += 1
+        if i >= len(distribution):
+            print(i)
+            print(distribution)
+            print(total)
+            print(choice)
         total += distribution[i]
     return values[i]
 
@@ -271,17 +275,23 @@ class Net:
         return Net(args)
 
     def __init__(self, args):
+        self.trained = False
         self.train_data =args["train_data"]
         self.test_data = args["test_data"]
         self.train_target = args["train_target"]
         self.test_target = args["test_target"]
         
-        if "layer_sizes" not in args:
-            layer_depth = int(random.uniform(1, 5))
-            layer_sizes = [int(random.uniform(2, 5)) for i in range(layer_depth)]
+        if "layer_sizes" in args:
+            self.layer_sizes = args["layer_sizes"]
+        elif "layer_parameters" in args:
+            layer_depth = int(random.uniform(1, args["layer_parameters"][0]))
+            layer_sizes = [int(random.uniform(2, args["layer_parameters"][1])) for i in range(layer_depth)]
             self.layer_sizes = layer_sizes
         else:
-            self.layer_sizes = args["layer_sizes"]
+            print("Going with defaults.")
+            layer_depth = int(random.uniform(1, 4))
+            layer_sizes = [int(random.uniform(2, 14)) for i in range(layer_depth)]
+            self.layer_sizes = layer_sizes
 
         self.net = None
 
@@ -290,7 +300,7 @@ class Net:
         for size in self.layer_sizes:
             if random.uniform(0,1) < p:
                 offset = 2*int(2*random.uniform(0, 1)) - 1
-                print("offset " + str(offset))
+                #print("offset " + str(offset))
                 new_layer_sizes.append(max(size + offset, 1))
             else:
                 new_layer_sizes.append(size)
@@ -305,8 +315,10 @@ class Net:
         #return [copy.deepcopy(self), copy.deepcopy(other)]
 
     def train(self):
-        self.net = MLPClassifier(tuple(self.layer_sizes))
-        self.net.fit(self.train_data, self.train_target)
+        if not self.trained:
+            self.net = MLPClassifier(tuple(self.layer_sizes),max_iter=1000,solver='lbfgs')
+            self.net.fit(self.train_data, self.train_target)
+            self.trained = True
         
     def test(self):
         assert self.net is not None
@@ -384,7 +396,32 @@ class GA:
         string = "Generation: " + str(self.generation) + "\n"
         for dna in self.population:
             string += "  " + str(dna) + ", fit is: " + str(self.fit(dna)) + "\n"
+        best = self.getTop()
+        string += "Best model is " + str(best) + " with fit " + str(self.fit(best)) + "\n"
         return string
+
+# Balloons data
+balloonsData = numpy.array([[1,0,1,0,1,0,1,0],
+                         [1,0,1,0,1,0,1,0],
+                         [1,0,1,0,1,0,0,1],
+                         [1,0,1,0,0,1,1,0],
+                         [1,0,1,0,0,1,0,1],
+                         [1,0,0,1,1,0,1,0],
+                         [1,0,0,1,1,0,1,0],
+                         [1,0,0,1,1,0,0,1],
+                         [1,0,0,1,0,1,1,0],
+                         [1,0,0,1,0,1,0,1],
+                         [0,1,1,0,1,0,1,0],
+                         [0,1,1,0,1,0,1,0],
+                         [0,1,1,0,1,0,0,1],
+                         [0,1,1,0,0,1,1,0],
+                         [0,1,1,0,0,1,0,1],
+                         [0,1,0,1,1,0,1,0],
+                         [0,1,0,1,1,0,1,0],
+                         [0,1,0,1,1,0,0,1],
+                         [0,1,0,1,0,1,1,0],
+                         [0,1,0,1,0,1,0,1]])
+balloonsTarget = numpy.array([1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
 
 # Main wrapper 
 if __name__ == '__main__':
@@ -395,10 +432,44 @@ if __name__ == '__main__':
     args = parser.parse_args()
     filename = args.data"""
 
+    # Parses Pima Indians diabetes data
+    f = open("data/pima-indians-diabetes.data")
+    lines = list(f)
+    diabetesData = []
+    diabetesTarget = []
+    for line in lines:
+        line.replace('\n','')
+        values = line.split(',')
+        dataPoint = [float(values[i]) for i in range(len(values) - 1)]
+        diabetesData.append(dataPoint)
+        diabetesTarget.append(values[len(values) - 1])
+    data = numpy.array(diabetesData)
+    target = numpy.array(diabetesTarget)
+
+    # Parses ionosphere data
+    f = open("data/ionosphere.data")
+    lines = list(f)
+    ionosphereData = []
+    ionosphereTarget = []
+    for line in lines:
+        values = line.split(',')
+        dataPoint = [float(values[i]) for i in range(len(values) - 1)]
+        ionosphereData.append(dataPoint)
+        if 'g\n' in values:
+            dataPointTarget = 1
+        else:
+            dataPointTarget = 0
+        ionosphereTarget.append(dataPointTarget)
+    #data = numpy.array(ionosphereData)
+    #target = numpy.array(ionosphereTarget)
+        
+
 
     digits = datasets.load_digits()
-    data = digits.data
-    target = digits.target
+    #data = digits.data
+    #target = digits.target
+    #data = balloonsData
+    #target = balloonsTarget
     
     pctTest = 0.1
     split = [int(len(data)*pctTest), len(data) - int(len(data)*pctTest)]
@@ -411,18 +482,19 @@ if __name__ == '__main__':
     print("________________________________________________________")
 
     dnaArgs = {"test_target": test_target, "train_target": train_target, 
-	       "test_data": test, "train_data": train}
+	       "test_data": test, "train_data": train, "layer_parameters": (4, 14)}
     net = Net(dnaArgs)
     net.train()
     print(net.test())
 
     gaArgs  = GA.Settings()
-    gaArgs.populationSize = 4
+    gaArgs.populationSize = 12
 
     ga = GA(Net, dnaArgs, lambda l: l.fit(), gaArgs)
     ga.initializeRandom()
     print(ga)
     
-    for i in range(3):
+    for i in range(6):
         ga.advance()
         print(ga)
+
