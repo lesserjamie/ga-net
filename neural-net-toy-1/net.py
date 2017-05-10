@@ -1,6 +1,7 @@
 # Program for ...
 # Students: ...
 
+import json
 import sys
 import argparse
 import random
@@ -276,11 +277,14 @@ class Net:
 
     def __init__(self, args):
         self.trained = False
-        self.train_data =args["train_data"]
-        self.test_data = args["test_data"]
-        self.train_target = args["train_target"]
-        self.test_target = args["test_target"]
-        
+        self.data = args["data"]
+        self.target = args["target"]
+        self.pctValidate = 0.1
+        self.fitValue   = None
+
+        if "fit_parameters" in args: 
+            self.pctValidate = args["fit_parameters"]
+
         if "layer_sizes" in args:
             self.layer_sizes = args["layer_sizes"]
         elif "layer_parameters" in args:
@@ -310,29 +314,53 @@ class Net:
         idx1 = int(random.uniform(0, len(self.layer_sizes)))
         idx2 = int(random.uniform(0, len(other.layer_sizes)))
 
-        return [Net({"train_data" : self.train_data, "test_data" : self.test_data, "train_target" : self.train_target, "test_target" : self.test_target, "layer_sizes" : self.layer_sizes[:idx1] + other.layer_sizes[idx2:]}),
-                Net({"train_data" : self.train_data, "test_data" : self.test_data, "train_target" : self.train_target, "test_target" : self.test_target, "layer_sizes" : other.layer_sizes[:idx2] + self.layer_sizes[idx1:]})]
-        #return [copy.deepcopy(self), copy.deepcopy(other)]
+        return [Net({"data" : self.data, "target" : self.target, "fit_parameters": self.pctValidate,
+                     "layer_sizes" : self.layer_sizes[:idx1] + other.layer_sizes[idx2:]}),
+                Net({"data" : self.data, "target" : self.target, "fit_parameters": self.pctValidate,
+                     "layer_sizes" : other.layer_sizes[:idx2] + self.layer_sizes[idx1:]})]
 
     def train(self):
         if not self.trained:
             self.net = MLPClassifier(tuple(self.layer_sizes),max_iter=1000,solver='lbfgs')
-            self.net.fit(self.train_data, self.train_target)
+            self.net.fit(self.data, self.target)
             self.trained = True
         
-    def test(self):
-        assert self.net is not None
-        return self.net.score(self.test_data, self.test_target)
-
     def fit(self):
-        self.train()
-        return self.test()
-	
+        if self.fitValue is not None:
+            return self.fitValue
+
+        numTests = min(int(math.floor(1.0 / self.pctValidate)), len(data))
+        split = []
+        error = 0.0
+
+        for i in range(numTests):
+            error += len(self.data) * self.pctValidate
+            split.append(int(math.floor(error)))
+            error -= math.floor(error)
+        
+        assert numpy.sum(split) == len(self.data)
+        assert len(split) == numTests
+        split = [numpy.sum(split[:i+1]) for i in range(len(split) - 1)]
+
+        target_partition = numpy.split(self.target, split)
+        data_partition = numpy.split(self.data, split)
+        scoreSum = 0.0
+
+        for i in range(numTests):
+            train_data = numpy.concatenate(tuple(data_partition[:i] + data_partition[i + 1:]))
+            train_target = numpy.concatenate(tuple(target_partition[:i] + target_partition[i + 1:]))
+            net = MLPClassifier(tuple(self.layer_sizes),max_iter=1000,solver='lbfgs')
+            net.fit(train_data, train_target)            
+            scoreSum += net.score(data_partition[i], target_partition[i])
+
+        self.fitValue = scoreSum / float(numTests)
+        return self.fitValue
+
     def __str__(self):
         return str(self.layer_sizes)
 
     def hash(self):
-        return self.layer_sizes
+        return json.dumps(self.layer_sizes)
 
 
 class GA:
@@ -351,6 +379,7 @@ class GA:
         self.dnaArgs    = dnaArgs
         self.fit        = fit
         self.generation = 0
+        self.csv = "generation,fit,hash\n"
 
     def initializeRandom(self):
         self.population = [self.dnaClass.generate(self.dnaArgs)\
@@ -358,18 +387,15 @@ class GA:
 
     def advance(self):
         # build counter dictionary using fit for probability
+        # now don't need to worry about hashes because no duplicates in a generation
         probDist = Counter()
-        hashes = []
         for dna in self.population:
-            if dna.hash() not in hashes:
-                probDist[dna] += self.fit(dna)
-                hashes.append(dna.hash())
-                #print dna, self.fit(dna)
+            probDist[dna] += self.fit(dna)
         
-        newGen = probDist.sortedKeys()[:int(math.floor(self.settings.percentKept * self.settings.populationSize + random.uniform(0, 1)))]
-        # pick floor(n + 1) dnas from parent generation
+        newGen = self.population[:int(math.floor(self.settings.percentKept * self.settings.populationSize + random.uniform(0, 1)))]
+        hashes = [dna.hash() for dna in newGen]
 
-        for i in range((self.settings.populationSize + 1 - len(newGen)) // 2):
+        while len(newGen) < self.settings.populationSize:
             parent1 = sampleFromCounter(probDist)
             parent2 = sampleFromCounter(probDist)
             next = []
@@ -379,7 +405,9 @@ class GA:
                 next = [copy.deepcopy(parent1), copy.deepcopy(parent2)]
             for dna in next:
                 dna.mutate(self.settings.probMutate)
-            newGen.extend(next)
+                if dna.hash() not in hashes:
+                    newGen.append(dna)
+                    hashes.append(dna.hash())
 
         if len(newGen) > self.settings.populationSize: newGen = newGen[:-1]
         assert len(newGen) == self.settings.populationSize           
@@ -388,9 +416,16 @@ class GA:
         self.population.sort(key=lambda a: self.fit(a), reverse=True)
         self.generation += 1
 
+        for dna in self.population:
+            self.csv += (str(self.generation) + ";" 
+                         + str(self.fit(dna)) + ";"
+                         + str(dna.hash()) + "\n")
+
+    def getCSV(self):
+        return self.csv
+
     def getTop(self):
         return self.population[0]
-
            
     def __str__(self):
         string = "Generation: " + str(self.generation) + "\n"
@@ -443,8 +478,9 @@ if __name__ == '__main__':
         dataPoint = [float(values[i]) for i in range(len(values) - 1)]
         diabetesData.append(dataPoint)
         diabetesTarget.append(values[len(values) - 1])
-    data = numpy.array(diabetesData)
-    target = numpy.array(diabetesTarget)
+    f.close()
+    #data = numpy.array(diabetesData)
+    #target = numpy.array(diabetesTarget)
 
     # Parses ionosphere data
     f = open("data/ionosphere.data")
@@ -460,9 +496,9 @@ if __name__ == '__main__':
         else:
             dataPointTarget = 0
         ionosphereTarget.append(dataPointTarget)
-    #data = numpy.array(ionosphereData)
-    #target = numpy.array(ionosphereTarget)
-        
+    data = numpy.array(ionosphereData)
+    target = numpy.array(ionosphereTarget)
+    f.close()
 
 
     digits = datasets.load_digits()
@@ -470,31 +506,28 @@ if __name__ == '__main__':
     #target = digits.target
     #data = balloonsData
     #target = balloonsTarget
-    
-    pctTest = 0.1
-    split = [int(len(data)*pctTest), len(data) - int(len(data)*pctTest)]
-    split_target = numpy.split(target, split)
-    test_target = split_target[0]
-    train_target = split_target[1]
-    split_data = numpy.split(data, split)
-    test = split_data[0]
-    train = split_data[1]
-    print("________________________________________________________")
+     
+    #print("________________________________________________________")
 
-    dnaArgs = {"test_target": test_target, "train_target": train_target, 
-	       "test_data": test, "train_data": train, "layer_parameters": (4, 14)}
-    net = Net(dnaArgs)
-    net.train()
-    print(net.test())
+    dnaArgs = {"data": data, 
+	       "target": target, 
+               "layer_parameters": (4, 6),
+               "fit_parameters": 0.1}
 
     gaArgs  = GA.Settings()
     gaArgs.populationSize = 12
 
     ga = GA(Net, dnaArgs, lambda l: l.fit(), gaArgs)
     ga.initializeRandom()
-    print(ga)
+    #print(ga)
     
-    for i in range(6):
+    for i in range(10):
         ga.advance()
-        print(ga)
+        #print(ga)
 
+    #print("________________________________________________________")
+
+    print(ga.getCSV())
+    output = open("output.txt", "w")
+    output.write(ga.getCSV())
+    output.close()
