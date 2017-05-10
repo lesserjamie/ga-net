@@ -281,6 +281,7 @@ class Net:
         self.target = args["target"]
         self.pctValidate = 0.1
         self.fitValue   = None
+        self.fitValueOccams = None
 
         if "fit_parameters" in args: 
             self.pctValidate = args["fit_parameters"]
@@ -303,6 +304,7 @@ class Net:
         new_layer_sizes = []
         for size in self.layer_sizes:
             if random.uniform(0,1) < p:
+                self.trained = False
                 offset = 2*int(2*random.uniform(0, 1)) - 1
                 #print("offset " + str(offset))
                 new_layer_sizes.append(max(size + offset, 1))
@@ -321,12 +323,14 @@ class Net:
 
     def train(self):
         if not self.trained:
-            self.net = MLPClassifier(tuple(self.layer_sizes),max_iter=1000,solver='lbfgs')
+            self.net = MLPClassifier(tuple(self.layer_sizes),solver='lbfgs')
             self.net.fit(self.data, self.target)
             self.trained = True
         
-    def fit(self):
-        if self.fitValue is not None:
+    def fit(self, occams):
+        if self.fitValueOccams is not None and occams:
+            return self.fitValueOccams
+        if self.fitValue is not None and not occams:
             return self.fitValue
 
         numTests = min(int(math.floor(1.0 / self.pctValidate)), len(data))
@@ -349,12 +353,17 @@ class Net:
         for i in range(numTests):
             train_data = numpy.concatenate(tuple(data_partition[:i] + data_partition[i + 1:]))
             train_target = numpy.concatenate(tuple(target_partition[:i] + target_partition[i + 1:]))
-            net = MLPClassifier(tuple(self.layer_sizes),max_iter=1000,solver='lbfgs')
+            net = MLPClassifier(tuple(self.layer_sizes),solver='lbfgs')
             net.fit(train_data, train_target)            
             scoreSum += net.score(data_partition[i], target_partition[i])
 
         self.fitValue = scoreSum / float(numTests)
-        return self.fitValue
+        # Occam's razor implementation; fitValue modified based on how many nodes used, with fewer being better, with the 56 coming from the defaults chosen above
+        self.fitValueOccams = self.fitValue + .3 * (56.0 - sum(self.layer_sizes)) / 56.0
+        if occams:
+            return self.fitValueOccams
+        else:
+            return self.fitValue
 
     def __str__(self):
         return str(self.layer_sizes)
@@ -390,7 +399,7 @@ class GA:
         # now don't need to worry about hashes because no duplicates in a generation
         probDist = Counter()
         for dna in self.population:
-            probDist[dna] += self.fit(dna)
+            probDist[dna] += self.fit(dna, True)
         
         newGen = self.population[:int(math.floor(self.settings.percentKept * self.settings.populationSize + random.uniform(0, 1)))]
         hashes = [dna.hash() for dna in newGen]
@@ -413,12 +422,12 @@ class GA:
         assert len(newGen) == self.settings.populationSize           
 
         self.population = newGen
-        self.population.sort(key=lambda a: self.fit(a), reverse=True)
+        self.population.sort(key=lambda a: self.fit(a, True), reverse=True)
         self.generation += 1
 
         for dna in self.population:
             self.csv += (str(self.generation) + ";" 
-                         + str(self.fit(dna)) + ";"
+                         + str(self.fit(dna, False)) + ";"
                          + str(dna.hash()) + "\n")
 
     def getCSV(self):
@@ -430,9 +439,9 @@ class GA:
     def __str__(self):
         string = "Generation: " + str(self.generation) + "\n"
         for dna in self.population:
-            string += "  " + str(dna) + ", fit is: " + str(self.fit(dna)) + "\n"
+            string += "  " + str(dna) + ", fit is: " + str(self.fit(dna, False)) + "\n"
         best = self.getTop()
-        string += "Best model is " + str(best) + " with fit " + str(self.fit(best)) + "\n"
+        string += "Best model is " + str(best) + " with fit " + str(self.fit(best, False)) + "\n"
         return string
 
 # Balloons data
@@ -496,8 +505,28 @@ if __name__ == '__main__':
         else:
             dataPointTarget = 0
         ionosphereTarget.append(dataPointTarget)
-    data = numpy.array(ionosphereData)
-    target = numpy.array(ionosphereTarget)
+    #data = numpy.array(ionosphereData)
+    #target = numpy.array(ionosphereTarget)
+    f.close()
+
+    # Parses Connect 4 data
+    f = open("data/connect-4.data")
+    lines = list(f)
+    connect4Data = []
+    connect4Target = []
+    for line in lines:
+        values = line.split(',')
+        dataPoint = [0 if values[i] == 'b' else (1 if values[i] == 'x' else -1) for i in range(len(values) - 1)]
+        connect4Data.append(dataPoint)
+        if 'win\n' in values:
+            dataPointTarget = 1
+        elif 'loss\n' in values:
+            dataPointTarget = -1
+        else:
+            dataPointTarget = 0
+        connect4Target.append(dataPointTarget)
+    data = numpy.array(connect4Data)
+    target = numpy.array(connect4Target)
     f.close()
 
 
@@ -517,11 +546,11 @@ if __name__ == '__main__':
     gaArgs  = GA.Settings()
     gaArgs.populationSize = 12
 
-    ga = GA(Net, dnaArgs, lambda l: l.fit(), gaArgs)
+    ga = GA(Net, dnaArgs, lambda l, o: l.fit(o), gaArgs)
     ga.initializeRandom()
     #print(ga)
     
-    for i in range(10):
+    for i in range(12):
         ga.advance()
         #print(ga)
 

@@ -20,8 +20,8 @@ if __name__ == '__main__':
     plt.close(fig)
 
     fig, ax = plt.subplots( nrows=1, ncols=1 )
-    ax.plot(data['generation'], [len(l) for l in data['layers']], 'bo')
-    plt.xlabel('Hidden Layer Depth')
-    plt.ylabel('Fit')
+    ax.plot(data['generation'], [sum(l) for l in data['layers']], 'bo')
+    plt.xlabel('Generation')
+    plt.ylabel('Number of Nodes')
     fig.savefig('./layer_depth.png') 
     plt.close(fig)
