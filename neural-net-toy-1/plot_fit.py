@@ -13,15 +13,16 @@ def complexity(layer_sizes):
     return count
 
 if __name__ == '__main__':
-    dataname = 'diabetes'
+    #dataname = 'diabetes'
     #dataname = 'ionosphere'
+    dataname = 'connect4'
 
     # without occam's razor
     filename = './output_' + dataname + '.txt'
-    data = numpy.genfromtxt(filename, delimiter=';', skip_header = 1,
-                            names=('generation', 'fit', 'layers'), 
-                            dtype=(float, float, list), 
-                            converters = {2: lambda s: json.loads(str(s).strip("b'"))})
+    #data = numpy.genfromtxt(filename, delimiter=';', skip_header = 1,
+    #                        names=('generation', 'fit', 'layers'), 
+    #                        dtype=(float, float, list), 
+    #                        converters = {2: lambda s: json.loads(str(s).strip("b'"))})
 
     # with occam's razor
     filenameO = './output_' + dataname + '_occams.txt'
@@ -38,11 +39,11 @@ if __name__ == '__main__':
     ax.yaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
     ax.xaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
 
-    ax.plot(data['generation'], data['fit'], 'g.', alpha=0.1)
+    #ax.plot(data['generation'], data['fit'], 'g.', alpha=0.1)
     ax.plot(dataO['generation'], dataO['fit'], 'b.', alpha=0.1)
-    ax.plot(list(set(data['generation'])),
-            [numpy.average([d['fit'] for d in data if d['generation'] == g]) for g in set(data['generation'])],
-            'g', label = "Without Occam's")
+    #ax.plot(list(set(data['generation'])),
+    #        [numpy.average([d['fit'] for d in data if d['generation'] == g]) for g in set(data['generation'])],
+    #        'g', label = "Without Occam's")
     ax.plot(list(set(dataO['generation'])),
             [numpy.average([d['fit'] for d in dataO if d['generation'] == g]) for g in set(dataO['generation'])],
             'b', label = "With Occam's")
@@ -63,11 +64,11 @@ if __name__ == '__main__':
     ax.yaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
     ax.xaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
 
-    ax.plot(data['generation'], data['fit'], 'g.', alpha=0.1)
+    #ax.plot(data['generation'], data['fit'], 'g.', alpha=0.1)
     ax.plot(dataO['generation'], dataO['fit'], 'b.', alpha=0.1)
-    ax.plot(list(set(data['generation'])),
-            [numpy.max([d['fit'] for d in data if d['generation'] == g]) for g in set(data['generation'])],
-            'g', label = "Without Occam's")
+    #ax.plot(list(set(data['generation'])),
+    #        [numpy.max([d['fit'] for d in data if d['generation'] == g]) for g in set(data['generation'])],
+    #        'g', label = "Without Occam's")
     ax.plot(list(set(dataO['generation'])),
             [numpy.max([d['fit'] for d in dataO if d['generation'] == g]) for g in set(dataO['generation'])],
             'b', label = "With Occam's")
@@ -86,11 +87,11 @@ if __name__ == '__main__':
     ax.yaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
     ax.xaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
 
-    ax.plot(data['generation'], [sum(l) for l in data['layers']], 'g.', alpha=0.1)
+    #ax.plot(data['generation'], [sum(l) for l in data['layers']], 'g.', alpha=0.1)
     ax.plot(dataO['generation'], [sum(l) for l in dataO['layers']], 'b.', alpha=0.1)
-    ax.plot(list(set(data['generation'])),
-            [numpy.average([sum(d['layers']) for d in data if d['generation'] == g]) for g in set(data['generation'])],
-            'g', label = "Without Occam's")
+    #ax.plot(list(set(data['generation'])),
+    #        [numpy.average([sum(d['layers']) for d in data if d['generation'] == g]) for g in set(data['generation'])],
+    #        'g', label = "Without Occam's")
     ax.plot(list(set(dataO['generation'])),
             [numpy.average([sum(d['layers']) for d in dataO if d['generation'] == g]) for g in set(dataO['generation'])],
             'b', label = "With Occam's")
@@ -109,11 +110,11 @@ if __name__ == '__main__':
     ax.yaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
     ax.xaxis.grid(color='gray', linestyle='dashed', alpha=0.5)
 
-    ax.plot(data['generation'], [complexity(l) for l in data['layers']], 'g.', alpha=0.1)
+    #ax.plot(data['generation'], [complexity(l) for l in data['layers']], 'g.', alpha=0.1)
     ax.plot(dataO['generation'], [complexity(l) for l in dataO['layers']], 'b.', alpha=0.1)
-    ax.plot(list(set(data['generation'])),
-            [numpy.average([complexity(d['layers']) for d in data if d['generation'] == g]) for g in set(data['generation'])],
-            'g', label = "Without Occam's")
+    #ax.plot(list(set(data['generation'])),
+    #        [numpy.average([complexity(d['layers']) for d in data if d['generation'] == g]) for g in set(data['generation'])],
+    #        'g', label = "Without Occam's")
     ax.plot(list(set(dataO['generation'])),
             [numpy.average([complexity(d['layers']) for d in dataO if d['generation'] == g]) for g in set(dataO['generation'])],
             'b', label = "With Occam's")

@@ -12,8 +12,7 @@ import numpy
 from sklearn import datasets
 from sklearn.neural_network import MLPClassifier
 
-DEBUG = True
-OCCAMS = False
+OCCAMS = True
 
 class Net:
     @staticmethod
@@ -189,99 +188,93 @@ class GA:
         string += "Best model is " + str(best) + " with fit " + str(self.fit(best, OCCAMS)) + "\n"
         return string
 
-# Balloons data
-balloonsData = numpy.array([[1,0,1,0,1,0,1,0],
-                         [1,0,1,0,1,0,1,0],
-                         [1,0,1,0,1,0,0,1],
-                         [1,0,1,0,0,1,1,0],
-                         [1,0,1,0,0,1,0,1],
-                         [1,0,0,1,1,0,1,0],
-                         [1,0,0,1,1,0,1,0],
-                         [1,0,0,1,1,0,0,1],
-                         [1,0,0,1,0,1,1,0],
-                         [1,0,0,1,0,1,0,1],
-                         [0,1,1,0,1,0,1,0],
-                         [0,1,1,0,1,0,1,0],
-                         [0,1,1,0,1,0,0,1],
-                         [0,1,1,0,0,1,1,0],
-                         [0,1,1,0,0,1,0,1],
-                         [0,1,0,1,1,0,1,0],
-                         [0,1,0,1,1,0,1,0],
-                         [0,1,0,1,1,0,0,1],
-                         [0,1,0,1,0,1,1,0],
-                         [0,1,0,1,0,1,0,1]])
-balloonsTarget = numpy.array([1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
+
+def loadData(name):
+    if name == "balloons":
+        # Balloons data
+        balloonsData = numpy.array([[1,0,1,0,1,0,1,0],
+                                    [1,0,1,0,1,0,1,0],
+                                    [1,0,1,0,1,0,0,1],
+                                    [1,0,1,0,0,1,1,0],
+                                    [1,0,1,0,0,1,0,1],
+                                    [1,0,0,1,1,0,1,0],
+                                    [1,0,0,1,1,0,1,0],
+                                    [1,0,0,1,1,0,0,1],
+                                    [1,0,0,1,0,1,1,0],
+                                    [1,0,0,1,0,1,0,1],
+                                    [0,1,1,0,1,0,1,0],
+                                    [0,1,1,0,1,0,1,0],
+                                    [0,1,1,0,1,0,0,1],
+                                    [0,1,1,0,0,1,1,0],
+                                    [0,1,1,0,0,1,0,1],
+                                    [0,1,0,1,1,0,1,0],
+                                    [0,1,0,1,1,0,1,0],
+                                    [0,1,0,1,1,0,0,1],
+                                    [0,1,0,1,0,1,1,0],
+                                    [0,1,0,1,0,1,0,1]])
+        balloonsTarget = numpy.array([1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0])
+        return (balloonsData, balloonsTarget)
+
+    if name == "digits":
+        digits = datasets.load_digits()
+        return (digits.data, digits.target)
+
+    if name == "connect-4":
+        # Parses Connect 4 data
+        f = open("data/connect-4.data")
+        lines = list(f)
+        data = []
+        connect4Target = []
+        for line in lines:
+            values = line.split(',')
+            dataPoint = [0 if values[i] == 'b' else (1 if values[i] == 'x' else -1) for i in range(len(values) - 1)]
+            data.append(dataPoint)
+            if 'win\n' in values:
+                dataPointTarget = 1
+            elif 'loss\n' in values:
+                dataPointTarget = -1
+            else:
+                dataPointTarget = 0
+                target.append(dataPointTarget)
+
+        f.close()
+        return (numpy.array(data), numpy.array(target))
+
+    if name == "diabetes": 
+        f = open("data/pima-indians-diabetes.data")
+        lines = list(f)
+        data = []
+        target = []
+        for line in lines:
+            line.replace('\n','')
+            values = line.split(',')
+            dataPoint = [float(values[i]) for i in range(len(values) - 1)]
+            data.append(dataPoint)
+            target.append(values[len(values) - 1])
+        f.close()
+        return (numpy.array(data), numpy.array(target))
+
+    else:
+        f = open("data/ionosphere.data")
+        lines = list(f)
+        data = []
+        target = []
+        for line in lines:
+            values = line.split(',')
+            dataPoint = [float(values[i]) for i in range(len(values) - 1)]
+            data.append(dataPoint)
+            if 'g\n' in values:
+                dataPointTarget = 1
+            else:
+                dataPointTarget = 0
+            target.append(dataPointTarget)
+        f.close()
+        return (numpy.array(data), numpy.array(target))
+
 
 # Main wrapper 
 if __name__ == '__main__':
-
-    """parser = argparse.ArgumentParser(description='Write me.')
-    parser.add_argument('-data', action="store", dest="data", default="data/yellow-small.data")
-
-    args = parser.parse_args()
-    filename = args.data"""
-
-    # Parses Pima Indians diabetes data
-    f = open("data/pima-indians-diabetes.data")
-    lines = list(f)
-    diabetesData = []
-    diabetesTarget = []
-    for line in lines:
-        line.replace('\n','')
-        values = line.split(',')
-        dataPoint = [float(values[i]) for i in range(len(values) - 1)]
-        diabetesData.append(dataPoint)
-        diabetesTarget.append(values[len(values) - 1])
-    f.close()
-    data = numpy.array(diabetesData)
-    target = numpy.array(diabetesTarget)
-
-    # Parses ionosphere data
-    f = open("data/ionosphere.data")
-    lines = list(f)
-    ionosphereData = []
-    ionosphereTarget = []
-    for line in lines:
-        values = line.split(',')
-        dataPoint = [float(values[i]) for i in range(len(values) - 1)]
-        ionosphereData.append(dataPoint)
-        if 'g\n' in values:
-            dataPointTarget = 1
-        else:
-            dataPointTarget = 0
-        ionosphereTarget.append(dataPointTarget)
-    #data = numpy.array(ionosphereData)
-    #target = numpy.array(ionosphereTarget)
-    f.close()
-
-    # Parses Connect 4 data
-    f = open("data/connect-4.data")
-    lines = list(f)
-    connect4Data = []
-    connect4Target = []
-    for line in lines:
-        values = line.split(',')
-        dataPoint = [0 if values[i] == 'b' else (1 if values[i] == 'x' else -1) for i in range(len(values) - 1)]
-        connect4Data.append(dataPoint)
-        if 'win\n' in values:
-            dataPointTarget = 1
-        elif 'loss\n' in values:
-            dataPointTarget = -1
-        else:
-            dataPointTarget = 0
-        connect4Target.append(dataPointTarget)
-    #data = numpy.array(connect4Data)
-    #target = numpy.array(connect4Target)
-    f.close()
-
-
-    digits = datasets.load_digits()
-    #data = digits.data
-    #target = digits.target
-    #data = balloonsData
-    #target = balloonsTarget
-     
-    #print("________________________________________________________")
+    data, target = loadData("balloons")
 
     dnaArgs = {"data": data, 
 	       "target": target, 
@@ -289,21 +282,15 @@ if __name__ == '__main__':
                "fit_parameters": 0.1}
 
     gaArgs  = GA.Settings()
-    gaArgs.populationSize = 20
+    gaArgs.populationSize = 10
 
     ga = GA(Net, dnaArgs, lambda l, o: l.fit(o), gaArgs)
     ga.initializeRandom()
-    #print(ga)
     
-    for i in range(50):
+    for i in range(10):
         print(i)
         ga.advance()
 
-        #print(ga)
-
-    #print("________________________________________________________")
-
-    print(ga.getCSV())
     output = open("output.txt", "w")
     output.write(ga.getCSV())
     output.close()
